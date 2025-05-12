@@ -1,0 +1,6 @@
+<?xml version="1.0" ?>
+<LOG_ROOT>
+	<PROJECT NAME="VGA_8BIT">
+		<CBX_INST_ENTRY INSTANCE_NAME="|VGA_8bit|font_16x16_bold:name|altsyncram:Mux0_rtl_0" CBX_FILE_NAME="altsyncram_jqv.tdf"/>
+	</PROJECT>
+</LOG_ROOT>
