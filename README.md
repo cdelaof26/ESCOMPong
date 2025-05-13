@@ -12,4 +12,6 @@ Chinese FPGA Board: EP4CE6E22C8
 
 #### Versioning
 
+##### v0.0.2 Game logic
+
 ##### v0.0.1 Initial project
