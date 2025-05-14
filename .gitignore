@@ -1,4 +1,6 @@
 org_VGA_8bit.vhd
+images/img.jpeg
+VGA_8bit_64.vhd
 output_files
 *.DS_Store
 db
