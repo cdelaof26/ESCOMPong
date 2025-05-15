@@ -9,6 +9,8 @@ entity VGA_8bit is
         reset : in  std_logic;
 
         ps2_clock, ps2_data : in std_logic;
+
+        beep : out std_logic;
         
         display_rgb : out std_logic_vector(2 downto 0);
         hsync       : out std_logic;
@@ -85,14 +87,24 @@ architecture Behavioral of VGA_8bit is
     signal draw_player                          : std_logic;
 
     ----------------------------------------------------------------------------
-    -- Ball properties
+    -- Ball 1 properties
     ----------------------------------------------------------------------------
-    signal xball                              : integer := WIDTH / 2;
-    signal yball                              : integer := 52 + (HEIGHT - 56) / 2;
-    constant ball_radius                      : integer := 5;
-    signal ball_speed                         : integer := 5;
-    signal positive_x_speed, positive_y_speed : std_logic := '1';
-    signal draw_ball                          : std_logic;
+    constant ball_radius                          : integer := 5;
+    signal xball_1                                : integer := WIDTH / 2 - ball_radius * 2;
+    signal yball_1                                : integer := 52 + (HEIGHT - 56) / 2;
+    signal ball_speed_1                           : integer := 5;
+    signal positive_x_speed_1, positive_y_speed_1 : std_logic := '1';
+    signal draw_ball_1                            : std_logic;
+
+    ----------------------------------------------------------------------------
+    -- Ball 2 properties
+    ----------------------------------------------------------------------------
+    signal xball_2                                : integer := WIDTH / 2 + ball_radius * 2;
+    signal yball_2                                : integer := 52 + (HEIGHT - 56) / 2;
+    signal ball_speed_2                           : integer := 5;
+    signal positive_x_speed_2, positive_y_speed_2 : std_logic := '0';
+    signal draw_ball_2                            : std_logic;
+    signal enable_ball_2                          : std_logic := '1';
 
     ----------------------------------------------------------------------------
     -- Signals for keyboard input
@@ -161,6 +173,16 @@ begin
                         end if;
 
                         player_2_position <= player_2_position_aux;
+
+                    when x"16" => -- 1 -> Disable second ball
+                        if start_game = '0' then
+                            enable_ball_2 <= '0';
+                        end if;
+
+                    when x"1E" => -- 2 -> Enable second ball
+                        if start_game = '0' then
+                            enable_ball_2 <= '1';
+                        end if;
 
                     when x"29" => -- SPACE -> START
                         start_game <= '1';
@@ -236,81 +258,169 @@ begin
     process(reset, vga_clk, start_game, game_over)
         constant max_count : integer := 400_000;
         variable count : integer range 0 to max_count := 0;
+
+        variable int_score_player_1, int_score_player_2 : integer range 0 to 127 := 0;
+        variable int_player_1_speed, int_player_2_speed : integer range 0 to 127 := 10;
+        variable int_player_1_width, int_player_2_width : integer range 0 to HEIGHT / 2 - 62 := 50;
     begin
         if reset = '0' then
             count            := 0;
 
-            xball            <= WIDTH / 2;
-            yball            <= 52 + (HEIGHT - 56) / 2;
-            ball_speed       <= 5;
-            positive_x_speed <= '1';
-            positive_y_speed <= '1';
+            xball_1            <= WIDTH / 2 - ball_radius * 2;
+            yball_1            <= 52 + (HEIGHT - 56) / 2;
+            ball_speed_1       <= 5;
+            positive_x_speed_1 <= '1';
+            positive_y_speed_1 <= '1';
+
+            xball_2            <= WIDTH / 2 + ball_radius * 2;
+            yball_2            <= 52 + (HEIGHT - 56) / 2;
+            ball_speed_2       <= 5;
+            positive_x_speed_2 <= '0';
+            positive_y_speed_2 <= '0';
             
-            score_player_1   <= 0;
-            score_player_2   <= 0;
-            player_1_width   <= 50;
-            player_2_width   <= 50;
-            player_1_speed   <= 10;
-            player_2_speed   <= 10;
+
+            int_score_player_1 := 0;
+            int_score_player_2 := 0;
+            int_player_1_width := 50;
+            int_player_2_width := 50;
+            int_player_1_speed := 10;
+            int_player_2_speed := 10;
+
+            score_player_1 <= 0;
+            score_player_2 <= 0;
+            player_1_width <= 50;
+            player_2_width <= 50;
+            player_1_speed <= 10;
+            player_2_speed <= 10;
 
             game_over        <= '0';
         elsif (rising_edge(vga_clk) and start_game = '1' and game_over = '0') then
             count := count + 1;
 
             if (count = 0) then
-                if (xball + ball_speed + ball_radius < WIDTH - 10 and positive_x_speed = '1') then
-                    xball <= xball + ball_speed;
-                elsif (xball - ball_speed - ball_radius > 10) then
+                beep <= '0';
+
+                if (xball_1 + ball_speed_1 + ball_radius < WIDTH - 10 and positive_x_speed_1 = '1') then
+                    xball_1 <= xball_1 + ball_speed_1;
+                elsif (xball_1 - ball_speed_1 - ball_radius > 10) then
                     -- Ball has reached right side
-                    if (xball + ball_radius + ball_speed >= WIDTH - 10) then
-                        if ((yball > player_2_position + player_2_width) or (yball < player_2_position - player_2_width)) then
-                            ball_speed <= 5;
-                            score_player_1 <= score_player_1 + 1;
-                            player_1_speed <= player_1_speed - 1;
-                            player_2_speed <= player_2_speed + 1;
-                            player_1_width <= player_1_width + 5;
-                            player_2_width <= player_2_width - 5;
-                            if (player_2_width < 10) then
+                    if (xball_1 + ball_radius + ball_speed_1 >= WIDTH - 10) then
+                        if ((yball_1 > player_2_position + player_2_width) or (yball_1 < player_2_position - player_2_width)) then
+                            beep <= '1';
+                            ball_speed_1 <= 5;
+                            int_score_player_1 := int_score_player_1 + 1;
+                            int_player_1_speed := int_player_1_speed - 1;
+                            int_player_2_speed := int_player_2_speed + 1;
+                            int_player_1_width := int_player_1_width + 5;
+                            int_player_2_width := int_player_2_width - 5;
+                            if (int_player_2_width < 10) then
                                 game_over <= '1';
                             end if;
                         else
-                            ball_speed <= ball_speed + 1;
+                            ball_speed_1 <= ball_speed_1 + 1;
                         end if;
                     end if;
                     
-                    positive_x_speed <= '0';
-                    xball <= xball - ball_speed;
+                    positive_x_speed_1 <= '0';
+                    xball_1 <= xball_1 - ball_speed_1;
                 else
                     -- Ball has reached left side
-                    if (xball - ball_radius - ball_speed <= 10) then
-                        if ((yball > player_1_position + player_1_width) or (yball < player_1_position - player_1_width)) then
-                            ball_speed <= 5;
-                            score_player_2 <= score_player_2 + 1;
-                            player_1_speed <= player_1_speed + 1;
-                            player_2_speed <= player_2_speed - 1;
-                            player_1_width <= player_1_width - 5;
-                            player_2_width <= player_2_width + 5;
-                            if (player_1_width < 10) then
+                    if (xball_1 - ball_radius - ball_speed_1 <= 10) then
+                        if ((yball_1 > player_1_position + player_1_width) or (yball_1 < player_1_position - player_1_width)) then
+                            beep <= '1';
+                            ball_speed_1 <= 5;
+                            int_score_player_2 := int_score_player_2 + 1;
+                            int_player_1_speed := int_player_1_speed + 1;
+                            int_player_2_speed := int_player_2_speed - 1;
+                            int_player_1_width := int_player_1_width - 5;
+                            int_player_2_width := int_player_2_width + 5;
+                            if (int_player_1_width < 10) then
                                 game_over <= '1';
                             end if;
                         else
-                            ball_speed <= ball_speed + 1;
+                            ball_speed_1 <= ball_speed_1 + 1;
                         end if;
                     end if;
                     
-                    positive_x_speed <= '1';
-                    xball <= xball + ball_speed;
+                    positive_x_speed_1 <= '1';
+                    xball_1 <= xball_1 + ball_speed_1;
                 end if;
 
-                if (yball + ball_speed + ball_radius < HEIGHT - 10 and positive_y_speed = '1') then
-                    yball <= yball + ball_speed;
-                elsif (yball - ball_speed - ball_radius > 52) then
-                    positive_y_speed <= '0';
-                    yball <= yball - ball_speed;
+                if (yball_1 + ball_speed_1 + ball_radius < HEIGHT - 10 and positive_y_speed_1 = '1') then
+                    yball_1 <= yball_1 + ball_speed_1;
+                elsif (yball_1 - ball_speed_1 - ball_radius > 52) then
+                    positive_y_speed_1 <= '0';
+                    yball_1 <= yball_1 - ball_speed_1;
                 else
-                    positive_y_speed <= '1';
-                    yball <= yball + ball_speed;
+                    positive_y_speed_1 <= '1';
+                    yball_1 <= yball_1 + ball_speed_1;
                 end if;
+
+
+                if (enable_ball_2 = '1') then 
+                    if (xball_2 + ball_speed_2 + ball_radius < WIDTH - 10 and positive_x_speed_2 = '1') then
+                        xball_2 <= xball_2 + ball_speed_2;
+                    elsif (xball_2 - ball_speed_2 - ball_radius > 10) then
+                        -- Ball has reached right side
+                        if (xball_2 + ball_radius + ball_speed_2 >= WIDTH - 10) then
+                            if ((yball_2 > player_2_position + player_2_width) or (yball_2 < player_2_position - player_2_width)) then
+                                beep <= '1';
+                                ball_speed_2 <= 5;
+                                int_score_player_1 := int_score_player_1 + 1;
+                                int_player_1_speed := int_player_1_speed - 1;
+                                int_player_2_speed := int_player_2_speed + 1;
+                                int_player_1_width := int_player_1_width + 5;
+                                int_player_2_width := int_player_2_width - 5;
+                                if (int_player_2_width < 10) then
+                                    game_over <= '1';
+                                end if;
+                            else
+                                ball_speed_2 <= ball_speed_2 + 1;
+                            end if;
+                        end if;
+                        
+                        positive_x_speed_2 <= '0';
+                        xball_2 <= xball_2 - ball_speed_2;
+                    else
+                        -- Ball has reached left side
+                        if (xball_2 - ball_radius - ball_speed_2 <= 10) then
+                            if ((yball_2 > player_1_position + player_1_width) or (yball_2 < player_1_position - player_1_width)) then
+                                beep <= '1';
+                                ball_speed_2 <= 5;
+                                int_score_player_2 := int_score_player_2 + 1;
+                                int_player_1_speed := int_player_1_speed + 1;
+                                int_player_2_speed := int_player_2_speed - 1;
+                                int_player_1_width := int_player_1_width - 5;
+                                int_player_2_width := int_player_2_width + 5;
+                                if (int_player_1_width < 10) then
+                                    game_over <= '1';
+                                end if;
+                            else
+                                ball_speed_2 <= ball_speed_2 + 1;
+                            end if;
+                        end if;
+                        
+                        positive_x_speed_2 <= '1';
+                        xball_2 <= xball_2 + ball_speed_2;
+                    end if;
+
+                    if (yball_2 + ball_speed_2 + ball_radius < HEIGHT - 10 and positive_y_speed_2 = '1') then
+                        yball_2 <= yball_2 + ball_speed_2;
+                    elsif (yball_2 - ball_speed_2 - ball_radius > 52) then
+                        positive_y_speed_2 <= '0';
+                        yball_2 <= yball_2 - ball_speed_2;
+                    else
+                        positive_y_speed_2 <= '1';
+                        yball_2 <= yball_2 + ball_speed_2;
+                    end if;
+                end if;
+
+                score_player_1 <= int_score_player_1;
+                score_player_2 <= int_score_player_2;
+                player_1_width <= int_player_1_width;
+                player_2_width <= int_player_2_width;
+                player_1_speed <= int_player_1_speed;
+                player_2_speed <= int_player_2_speed;
             end if;
         end if;
     end process;
@@ -403,7 +513,8 @@ begin
         elsif rising_edge(vga_clk) then
             draw_border <= '0';
             draw_player <= '0';
-            draw_ball <= '0';
+            draw_ball_1 <= '0';
+            draw_ball_2 <= '0';
 
             if dat_act = '1' then
                 if (x >= 176 and x <= 464 and y >= 10 and y <= 42) then
@@ -455,6 +566,7 @@ begin
                     elsif (x >= 432 and x <= 464) then
                         char_num <= "1100111";
                         char_col <= std_logic_vector(to_unsigned((x - 432) / 2, 4));
+
                     end if;
 
                 elsif (((x >= 10 and x <= 106) or (x >= WIDTH - 106 and x <= WIDTH - 10)) and y >= 10 and y <= 42) then
@@ -501,8 +613,11 @@ begin
 
                 elsif (x >= WIDTH - 16 and x <= WIDTH - 12 and y >= player_2_position - player_2_width and y <= player_2_position + player_2_width) then
                     draw_player <= '1';
-                elsif ((x - xball) * (x - xball) + (y - yball) * (y - yball) <= ball_radius * ball_radius) then
-                    draw_ball <= '1';
+                elsif ((x - xball_1) * (x - xball_1) + (y - yball_1) * (y - yball_1) <= ball_radius * ball_radius) then
+                    draw_ball_1 <= '1';
+
+                elsif (enable_ball_2 = '1' and (x - xball_2) * (x - xball_2) + (y - yball_2) * (y - yball_2) <= ball_radius * ball_radius) then
+                    draw_ball_2 <= '1';
 
                 elsif (game_over = '1' and x >= WIDTH / 2 - 208 and x <= WIDTH / 2 + 208 and y >= 52 - 16 + (HEIGHT - 62) / 2 and y <= 52 + 16 + (HEIGHT - 62) / 2) then
                     -- "Fin del juego" will be printed in the middle
@@ -576,7 +691,7 @@ begin
     ----------------------------------------------------------------------------
     -- Output assignment for display_rgb.
     ----------------------------------------------------------------------------
-    display_rgb <= "111" when draw_text = '1' or draw_ball = '1' or draw_border = '1' else
+    display_rgb <= "111" when draw_text = '1' or draw_ball_1 = '1' or draw_ball_2 = '1' or draw_border = '1' else
                    "010" when draw_player = '1' else "000";
 
 end architecture Behavioral;
